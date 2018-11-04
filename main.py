@@ -1,3 +1,4 @@
+import time
 from typing import List
 import numpy as np
 import threading
@@ -11,7 +12,7 @@ class MyDate:
     day: int
 
     def __init__(self, id: int):
-        date = datetime.datetime(second=id)
+        date = datetime.datetime.utcfromtimestamp(id)
         self.year = date.year
         self.month = date.month
         self.day = date.day
@@ -87,7 +88,7 @@ class SongGetter:
         self.Songs = dict()
         self.next_id = 0
 
-    def get(self, id: int):
+    def get(self, id: str):
         return self.Songs[id]
 
     def create_song(self, track_id: str, song_id: str, artist: Artist, title: str):
@@ -107,6 +108,17 @@ class Song:
         self.title = title
 
 
+class Listening:
+    date: MyDate
+    user: User
+    song: Song
+
+    def __init__(self, date: MyDate, user: User, song: Song):
+        self.date = date
+        self.user = user
+        self.song = song
+
+
 def process_unique_tracks(file_path: str):
     artist_getter = ArtistGetter()
     songs_getter = SongGetter()
@@ -122,18 +134,37 @@ def process_unique_tracks(file_path: str):
 
 
 def process_triplets(file_path: str, song_getter: SongGetter):
+    listenings: List[Listening] = []
+    user_getter = UserGetter()
+
     with open(file_path, "r", encoding='utf-8', errors='ignore') as myfile:
-        data: List[str] = myfile.readlines()
-        print(data[0])
-    print("triplets_sample_20p.txt")
+        line = myfile.readline()
+        while line:
+            split_line = line[0:-1].split("<SEP>")
+            listenings.append(Listening(MyDate(int(split_line[2])), user_getter.get_user(split_line[0]),
+                              song_getter.get(split_line[1])))
+            line = myfile.readline()
+
+    return listenings
 
 
 def main():
+    conn = sqlite3.connect(":memory:")
+
     unique_tracks_path = "unique_tracks.txt"
     triplets_sample_path = "triplets_sample_20p.txt"
 
+    start_time = time.time()
+    print("start: process_unique_tracks")
     artist_getter, songs_getter = process_unique_tracks(unique_tracks_path)
-    process_triplets(triplets_sample_path)
+    elapsed_time = time.time() - start_time
+    print(elapsed_time)
+    print("start: process_triplets")
+    listenings = process_triplets(triplets_sample_path, songs_getter)
+    elapsed_time = time.time() - start_time
+    print(elapsed_time)
+
+
 
 
 main()
