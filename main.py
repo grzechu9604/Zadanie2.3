@@ -3,6 +3,7 @@ from typing import List
 import numpy as np
 import threading
 import datetime
+import sqlite3
 
 
 class MyDate:
@@ -52,23 +53,43 @@ class User:
 class ArtistGetter:
     artists: dict
     next_id: int
+    conn: sqlite3.Connection
 
-    def __init__(self):
+    def __init__(self, conn: sqlite3.Connection):
         self.artists = dict()
         self.next_id = 0
+        self.conn = conn
+        self.create_table()
+
+    def create_table(self):
+        c = self.conn.cursor()
+        c.execute("""create table artists (
+                    id integer primary key,
+                    name TEXT);
+                  """)
+        c.execute("""create unique index artist_name_idx on artists(name);""")
+        c.close()
 
     def get_artist(self, name: str):
-        try:
-            artist_to_return = self.artists[name]
-        except KeyError:
-            artist_to_return = None
+        artist = self.get_artist_from_db(name)
+        if not artist:
+            self.insert_artist_to_db(name)
+            artist = self.get_artist_from_db(name)
 
-        if not artist_to_return:
-            artist_to_return = Artist(self.next_id, name)
-            self.next_id += 1
-            self.artists[name] = artist_to_return
+        return artist
 
-        return artist_to_return
+    def get_artist_from_db(self, name: str):
+        c = self.conn.cursor()
+        c.execute("""select * from artists where name = ?;""", [name])
+        result = c.fetchall()
+        c.close()
+        if len(result) > 0:
+            return Artist(result[0][0], result[0][1])
+
+    def insert_artist_to_db(self, name: str):
+        c = self.conn.cursor()
+        c.execute("""insert into artists (name) values (?);""", [name])
+        c.close()
 
 
 class Artist:
@@ -120,7 +141,8 @@ class Listening:
 
 
 def process_unique_tracks(file_path: str):
-    artist_getter = ArtistGetter()
+    conn = sqlite3.connect(":memory:")
+    artist_getter = ArtistGetter(conn)
     songs_getter = SongGetter()
 
     with open(file_path, "r", encoding='utf-8', errors='ignore') as myfile:
