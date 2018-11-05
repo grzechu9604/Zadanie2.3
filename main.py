@@ -42,25 +42,18 @@ class DateGetter:
     def create_table(self):
         c = self.conn.cursor()
         c.execute("""create table dates (
-                    id integer primary key,
+                    id integer,
                     day integer,
                     month integer,
                     year integer);
                   """)
-        c.execute("""create index dates_day_idx on dates(day);""")
-        c.execute("""create index dates_month_idx on dates(month);""")
-        c.execute("""create index dates_year_idx on dates(year);""")
         c.close()
 
     def get_date_id(self, unix_timestamp: int):
         date = datetime.datetime.utcfromtimestamp(unix_timestamp)
-        date_id = self.get_date_id_from_db(date.day, date.month, date.year)
-        if not date_id:
-            date_id = self.insert_date_to_db(date.day, date.month, date.year)
+        return self.insert_date_to_db(unix_timestamp, date.day, date.month, date.year)
 
-        return date_id
-
-    def get_date_id_from_db(self, day: int, month: int, year: int):
+    def get_date_id_from_db(self, id :int, day: int, month: int, year: int):
         c = self.conn.cursor()
         c.execute("""select id from dates where day = ? and month = ? and year = ?;""", [day, month, year])
         result = c.fetchall()
@@ -68,7 +61,7 @@ class DateGetter:
         if len(result) > 0:
             return result[0][0]
 
-    def insert_date_to_db(self, day: int, month: int, year: int):
+    def insert_date_to_db(self, id :int, day: int, month: int, year: int):
         c = self.conn.cursor()
         c.execute("""insert into dates (day, month, year) values (?, ?, ?);""", [day, month, year])
         c.close()
