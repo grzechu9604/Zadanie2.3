@@ -242,7 +242,7 @@ join songs s on s.id = t.song_id limit 10;"""
         ,
         # zadanie 2:
         """select (select u.user_id from users u where  u.id = t.user_id), t.amount from (select user_id, 
-        count(distinct song_id) as amount from plays group by user_id order by count(distinct song_id) desc limit 10) t; """
+        count(distinct song_id) as amount from plays group by user_id order by count(distinct song_id) desc) t limit 10; """
         ,
         # zadanie 3:
         """select (select name from artists a where a.id = t.artist_id), t.amount from 
