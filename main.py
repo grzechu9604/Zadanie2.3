@@ -51,13 +51,9 @@ class User:
 
 
 class ArtistGetter:
-    artists: dict
-    next_id: int
     conn: sqlite3.Connection
 
     def __init__(self, conn: sqlite3.Connection):
-        self.artists = dict()
-        self.next_id = 0
         self.conn = conn
         self.create_table()
 
@@ -70,21 +66,21 @@ class ArtistGetter:
         c.execute("""create unique index artist_name_idx on artists(name);""")
         c.close()
 
-    def get_artist(self, name: str):
-        artist = self.get_artist_from_db(name)
-        if not artist:
+    def get_artist_id(self, name: str):
+        artist_id = self.get_artist_id_from_db(name)
+        if not artist_id:
             self.insert_artist_to_db(name)
-            artist = self.get_artist_from_db(name)
+            artist_id = self.get_artist_id_from_db(name)
 
-        return artist
+        return artist_id
 
-    def get_artist_from_db(self, name: str):
+    def get_artist_id_from_db(self, name: str):
         c = self.conn.cursor()
         c.execute("""select * from artists where name = ?;""", [name])
         result = c.fetchall()
         c.close()
         if len(result) > 0:
-            return Artist(result[0][0], result[0][1])
+            return result[0][0]
 
     def insert_artist_to_db(self, name: str):
         c = self.conn.cursor()
@@ -92,69 +88,56 @@ class ArtistGetter:
         c.close()
 
 
-class Artist:
-    artist_id: int
-    name: str
-
-    def __init__(self, artist_id: int, name: str):
-        self.artist_id = artist_id
-        self.name = name
-
-
 class SongGetter:
-    Songs: dict
-    next_id: int
+    conn: sqlite3.Connection
 
-    def __init__(self):
-        self.Songs = dict()
-        self.next_id = 0
+    def __init__(self, conn: sqlite3.Connection):
+        self.conn = conn
+        self.create_table()
 
-    def get(self, id: str):
-        return self.Songs[id]
+    def create_table(self):
+        c = self.conn.cursor()
+        c.execute("""create table songs (
+                    id integer primary key,
+                    track_id text,
+                    song_id text,
+                    artist_id int,
+                    title text,
+                    FOREIGN KEY (artist_id) REFERENCES artists(id));
+                  """)
+        c.execute("""create index song_id_idx on songs(song_id);""")
+        c.close()
 
-    def create_song(self, track_id: str, song_id: str, artist: Artist, title: str):
-        self.Songs[song_id] = Song(track_id, song_id, artist, title)
+    def get_id(self, song_id: str):
+        c = self.conn.cursor()
+        c.execute("""select (id, track_id, song_id, artist_id, title) from songs where song_id = ?;""", [song_id])
+        result = c.fetchall()
+        c.close()
+        if len(result) > 0:
+            return result[0][0]
 
-
-class Song:
-    track_id: str
-    song_id: str
-    artist: Artist
-    title: str
-
-    def __init__(self, track_id: str, song_id: str, artist: Artist, title: str):
-        self.artist = artist
-        self.track_id = track_id
-        self.song_id = song_id
-        self.title = title
-
-
-class Listening:
-    date: MyDate
-    user: User
-    song: Song
-
-    def __init__(self, date: MyDate, user: User, song: Song):
-        self.date = date
-        self.user = user
-        self.song = song
+    def insert_song_to_db(self, track_id: str, song_id: str, artist_id: int, title: str):
+        c = self.conn.cursor()
+        c.execute("""insert into songs (track_id, song_id, artist_id, title) values (?, ?, ?, ?);""",
+                  [track_id, song_id, artist_id, title])
+        c.close()
 
 
 def process_unique_tracks(file_path: str):
     conn = sqlite3.connect(":memory:")
     artist_getter = ArtistGetter(conn)
-    songs_getter = SongGetter()
+    songs_getter = SongGetter(conn)
 
     with open(file_path, "r", encoding='utf-8', errors='ignore') as myfile:
         line = myfile.readline()
         while line:
             split_line = line[0:-1].split("<SEP>")
-            songs_getter.create_song(split_line[0], split_line[1], artist_getter.get_artist(split_line[2]), split_line[3])
+            songs_getter.insert_song_to_db(split_line[0], split_line[1], artist_getter.get_artist_id(split_line[2]), split_line[3])
             line = myfile.readline()
 
     return artist_getter, songs_getter
 
-
+'''
 def process_triplets(file_path: str, song_getter: SongGetter):
     listenings: List[Listening] = []
     user_getter = UserGetter()
@@ -168,7 +151,7 @@ def process_triplets(file_path: str, song_getter: SongGetter):
             line = myfile.readline()
 
     return listenings
-
+'''
 
 def main():
     conn = sqlite3.connect(":memory:")
@@ -182,7 +165,7 @@ def main():
     elapsed_time = time.time() - start_time
     print(elapsed_time)
     print("start: process_triplets")
-    listenings = process_triplets(triplets_sample_path, songs_getter)
+    #listenings = process_triplets(triplets_sample_path, songs_getter)
     elapsed_time = time.time() - start_time
     print(elapsed_time)
 
