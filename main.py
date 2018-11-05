@@ -238,11 +238,11 @@ def main():
     queries = [  # zadanie 1:
         """select s.title, (select name from artists a where a.id = s.artist_id), amount from 
 (select song_id, count(*) as amount from plays group by song_id order by count(*) desc limit 10) t
-join songs s on s.id = t.song_id;"""
+join songs s on s.id = t.song_id limit 10;"""
         ,
         # zadanie 2:
         """select (select u.user_id from users u where  u.id = t.user_id), t.amount from (select user_id, 
-        count(distinct song_id) as amount from plays order by count(distinct song_id) desc limit 10) t; """
+        count(distinct song_id) as amount from plays group by user_id order by count(distinct song_id) desc limit 10) t; """
         ,
         # zadanie 3:
         """select (select name from artists a where a.id = t.artist_id), t.amount from 
