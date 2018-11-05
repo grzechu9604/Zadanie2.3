@@ -192,6 +192,21 @@ class SongGetter:
         c.close()
 
 
+class QueryExecutor:
+    conn: sqlite3.Connection
+
+    def __init__(self, conn : sqlite3.Connection):
+        self.conn = conn
+
+    def execute_and_print(self, query: str):
+        c = self.conn.cursor()
+        c.execute(query)
+        result = c.fetchall()
+        c.close()
+        for line in result:
+            print(*line)
+
+
 def process_unique_tracks(file_path: str, conn: sqlite3.Connection):
 
     artist_getter = ArtistGetter(conn)
@@ -241,11 +256,13 @@ def main():
     elapsed_time = time.time() - start_time
     print(elapsed_time)
 
+    executor = QueryExecutor(conn)
+    executor.execute_and_print("select * from artists limit 10;")
+
     print("start: process_triplets")
-    process_triplets(triplets_sample_path, conn)
+    #process_triplets(triplets_sample_path, conn)
     elapsed_time = time.time() - start_time
     print(elapsed_time)
-
 
 
 
