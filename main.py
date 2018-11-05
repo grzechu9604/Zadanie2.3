@@ -56,8 +56,7 @@ class DateGetter:
         date = datetime.datetime.utcfromtimestamp(unix_timestamp)
         date_id = self.get_date_id_from_db(date.day, date.month, date.year)
         if not date_id:
-            self.insert_date_to_db(date.day, date.month, date.year)
-            date_id = self.get_date_id_from_db(date.day, date.month, date.year)
+            date_id = self.insert_date_to_db(date.day, date.month, date.year)
 
         return date_id
 
@@ -73,6 +72,7 @@ class DateGetter:
         c = self.conn.cursor()
         c.execute("""insert into dates (day, month, year) values (?, ?, ?);""", [day, month, year])
         c.close()
+        return c.lastrowid
 
 
 class UserGetter:
@@ -94,8 +94,7 @@ class UserGetter:
     def get_user_id(self, id: str):
         user_id = self.get_user_id_from_db(id)
         if not user_id:
-            self.insert_user_to_db(id)
-            user_id = self.get_user_id_from_db(id)
+            user_id = self.insert_user_to_db(id)
 
         return user_id
 
@@ -111,6 +110,8 @@ class UserGetter:
         c = self.conn.cursor()
         c.execute("""insert into users (user_id) values (?);""", [id])
         c.close()
+
+        return c.lastrowid
 
 
 class User:
@@ -141,8 +142,7 @@ class ArtistGetter:
     def get_artist_id(self, name: str):
         artist_id = self.get_artist_id_from_db(name)
         if not artist_id:
-            self.insert_artist_to_db(name)
-            artist_id = self.get_artist_id_from_db(name)
+            artist_id = self.insert_artist_to_db(name)
 
         return artist_id
 
@@ -158,6 +158,8 @@ class ArtistGetter:
         c = self.conn.cursor()
         c.execute("""insert into artists (name) values (?);""", [name])
         c.close()
+
+        return c.lastrowid
 
 
 class SongGetter:
@@ -217,6 +219,8 @@ def process_triplets(file_path: str, conn: sqlite3.Connection):
     song_getter = SongGetter(conn, False)
     play_inserter = PlayInserter(conn)
 
+    i = 0
+
     with open(file_path, "r", encoding='utf-8', errors='ignore') as myfile:
         line = myfile.readline()
         while line:
@@ -226,6 +230,10 @@ def process_triplets(file_path: str, conn: sqlite3.Connection):
             song_id = song_getter.get_id(split_line[1])
             play_inserter.insert_play_to_db(date_id, user_id, song_id)
             line = myfile.readline()
+
+            i += 1
+            if i % 1000 == 0:
+                print(i / float(27729357) * 100)
 
 
 def main():
