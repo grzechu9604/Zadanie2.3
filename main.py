@@ -1,7 +1,3 @@
-import time
-from typing import List
-import numpy as np
-import threading
 import datetime
 import sqlite3
 
@@ -53,19 +49,11 @@ class DateGetter:
         date = datetime.datetime.utcfromtimestamp(unix_timestamp)
         return self.insert_date_to_db(unix_timestamp, date.day, date.month, date.year)
 
-    def get_date_id_from_db(self, id :int, day: int, month: int, year: int):
+    def insert_date_to_db(self, id: int, day: int, month: int, year: int):
         c = self.conn.cursor()
-        c.execute("""select id from dates where day = ? and month = ? and year = ?;""", [day, month, year])
-        result = c.fetchall()
+        c.execute("""insert into dates (id, day, month, year) values (?, ?, ?, ?);""", [id, day, month, year])
         c.close()
-        if len(result) > 0:
-            return result[0][0]
-
-    def insert_date_to_db(self, id :int, day: int, month: int, year: int):
-        c = self.conn.cursor()
-        c.execute("""insert into dates (day, month, year) values (?, ?, ?);""", [day, month, year])
-        c.close()
-        return c.lastrowid
+        return id
 
 
 class UserGetter:
@@ -111,7 +99,7 @@ class User:
     id: int
     name: str
 
-    def __init__(self, id: int, name:str):
+    def __init__(self, id: int, name: str):
         self.id = id
         self.name = name
 
@@ -195,7 +183,7 @@ class SongGetter:
 class QueryExecutor:
     conn: sqlite3.Connection
 
-    def __init__(self, conn : sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
     def execute_and_print(self, query: str):
@@ -208,7 +196,6 @@ class QueryExecutor:
 
 
 def process_unique_tracks(file_path: str, conn: sqlite3.Connection):
-
     artist_getter = ArtistGetter(conn)
     songs_getter = SongGetter(conn, True)
 
@@ -227,8 +214,6 @@ def process_triplets(file_path: str, conn: sqlite3.Connection):
     song_getter = SongGetter(conn, False)
     play_inserter = PlayInserter(conn)
 
-    i = 0
-
     with open(file_path, "r", encoding='utf-8', errors='ignore') as myfile:
         line = myfile.readline()
         while line:
@@ -239,10 +224,6 @@ def process_triplets(file_path: str, conn: sqlite3.Connection):
             play_inserter.insert_play_to_db(date_id, user_id, song_id)
             line = myfile.readline()
 
-            i += 1
-            if i % 1000 == 0:
-                print(i / float(27729357) * 100)
-
 
 def main():
     conn = sqlite3.connect(":memory:")
@@ -250,20 +231,35 @@ def main():
     unique_tracks_path = "unique_tracks.txt"
     triplets_sample_path = "triplets_sample_20p.txt"
 
-    start_time = time.time()
-    print("start: process_unique_tracks")
     process_unique_tracks(unique_tracks_path, conn)
-    elapsed_time = time.time() - start_time
-    print(elapsed_time)
+
+    process_triplets(triplets_sample_path, conn)
+
+    queries = [  # zadanie 1:
+        """select s.title, (select name from artists a where a.id = s.artist_id), amount from 
+(select song_id, count(*) as amount from plays group by song_id order by count(*) desc limit 10) t
+join songs s on s.id = t.song_id;"""
+        ,
+        # zadanie 2:
+        """select (select u.user_id from users u where  u.id = t.user_id), t.amount from (select user_id, 
+        count(distinct song_id) as amount from plays order by count(distinct song_id) desc limit 10) t; """
+        ,
+        # zadanie 3:
+        """select (select name from artists a where a.id = t.artist_id), t.amount from 
+(select artist_id, count(*) as amount from songs s join plays p on s.id = p.song_id group by artist_id order by count(*) desc limit 1) t;"""
+        ,
+        # zadanie 4:
+        """select d.month, count(*) from dates d join plays p on p.date_id = d.id group by d.month order by d.month"""
+        ,
+        # zadanie 5:
+        """select user_id from users where id in (
+select user_id from plays where song_id in (
+select song_id from plays where song_id in (
+select id from songs where artist_id in (select id from artists where name = 'Queen')) group by song_id order by count(*) desc limit 3)) order by user_id limit 10"""]
 
     executor = QueryExecutor(conn)
-    executor.execute_and_print("select * from artists limit 10;")
-
-    print("start: process_triplets")
-    #process_triplets(triplets_sample_path, conn)
-    elapsed_time = time.time() - start_time
-    print(elapsed_time)
-
+    for query in queries:
+        executor.execute_and_print(query)
 
 
 main()
